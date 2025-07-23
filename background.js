@@ -44,11 +44,11 @@ async function generateNewsPost(tabId) {
       // Define prompt based on news type with professional tone and 8-hour freshness
       let summaryPrompt;
       if (newsType === 'top') {
-        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, very short one-sentence summary (5-12 words) of a major global event or topic from the last 8 hours, Source: [one outlet, e.g., Reuters]. Total length must be under 250 characters. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
+        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, one-sentence summary (15-30 words) of a major global event or topic from the last 8 hours, Source: [one outlet, e.g., Reuters]. Total length must be between 150 and 260 characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
       } else if (newsType === 'breaking') {
-        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, very short one-sentence summary (5-12 words) of a breaking news event from the last 8 hours, Source: [one outlet, e.g., CNN]. Total length must be under 250 characters. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
+        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, one-sentence summary (15-30 words) of a breaking news event from the last 8 hours, Source: [one outlet, e.g., CNN]. Total length must be between 150 and 260 characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
       } else if (newsType === 'viral') {
-        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, very short one-sentence summary (5-12 words) of a viral or trending topic (e.g., pop culture, technology) from the last 8 hours, Source: [one outlet, e.g., BBC]. Total length must be under 250 characters. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
+        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, one-sentence summary (15-30 words) of a viral or trending topic (e.g., pop culture, technology) from the last 8 hours, Source: [one outlet, e.g., BBC]. Total length must be between 150 and 260 characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
       }
       console.log('Using news type:', newsType);
 
@@ -63,7 +63,7 @@ async function generateNewsPost(tabId) {
         body: JSON.stringify({
           model: selectedModel,
           messages: [{ role: 'user', content: summaryPrompt }],
-          max_tokens: 70
+          max_tokens: 100  // Increased for longer summaries
         })
       });
       const summaryData = await summaryRes.json();
@@ -74,10 +74,14 @@ async function generateNewsPost(tabId) {
       summary = summaryData.choices[0].message.content.trim();
       console.log('Generated summary:', summary);
 
-      // Validate character limit
-      if (summary.length > 250) {
-        console.warn('Summary exceeds 250 characters, trimming...');
-        summary = summary.substring(0, 247) + '...';
+      // Validate length (150-260 characters)
+      const length = summary.length;
+      if (length < 150) {
+        console.log('Summary too short (', length, ' chars), regenerating...');
+        continue;
+      } if (length > 260) {
+        console.warn('Summary exceeds 260 characters, trimming...');
+        summary = summary.substring(0, 257) + '...';
       }
 
       // Validate source presence (flexible regex without required comma)
