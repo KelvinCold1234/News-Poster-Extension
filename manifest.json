@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "News Poster for X",
   "version": "1.0",
-  "description": "A Chrome extension that generates engaging news posts using ChatGPT API and populates them in X with a hotkey. Includes text-only news summary.",
+  "description": "A Chrome extension that generates concise news posts using ChatGPT API and populates them in X with a hotkey.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -24,8 +24,8 @@
   "commands": {
     "generate-post": {
       "suggested_key": {
-        "default": "Ctrl+Shift+K",
-        "mac": "Command+Shift+K"
+        "default": "Ctrl+Shift+N",
+        "mac": "Command+Shift+N"
       },
       "description": "Generate and populate a news post on X"
     }

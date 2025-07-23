@@ -54,6 +54,11 @@
       text-align: center;
       color: #4caf50; /* Green for success */
     }
+    .note {
+      font-size: 12px;
+      color: #b0b8c1;
+      margin-bottom: 15px;
+    }
   </style>
 </head>
 <body>
@@ -67,6 +72,11 @@
     <option value="gpt-4o">gpt-4o (high quality)</option>
     <option value="gpt-3.5-turbo">gpt-3.5-turbo (fast, low cost)</option>
   </select>
+
+  <h2>Hotkey</h2>
+  <label for="hotkey">Hotkey (e.g., Ctrl+Shift+N)</label>
+  <input id="hotkey" type="text" placeholder="Ctrl+Shift+N">
+  <div class="note">Valid: Ctrl, Shift, Alt, plus a letter (e.g., Ctrl+Shift+P). Set in chrome://extensions/shortcuts.</div>
 
   <button id="save">Save Settings</button>
   <div id="status"></div>
