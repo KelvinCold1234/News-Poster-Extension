@@ -1,6 +1,6 @@
 # News Poster for X
 
-A Chrome extension that generates news posts using the OpenAI ChatGPT API and populates them in X's composer with a customizable hotkey. Posts are customizable in format, with options for grabber style, summary length, character range, and source inclusion.
+A Chrome extension that generates customizable news posts using the OpenAI ChatGPT API and populates them in X's composer with a hotkey. Posts can be formatted to your style (e.g., grabber, word/char range, optional source).
 
 **Download from Chrome Web Store**: [Insert Store URL]
 
@@ -17,13 +17,13 @@ A Chrome extension that generates news posts using the OpenAI ChatGPT API and po
 - Review and click "Post" on X.
 
 ## Features
-- Generates posts with customizable format (e.g., grabber style, 15-30 words, 150–260 chars).
-- Option to include or exclude a source (e.g., "Source: Reuters").
+- Generates posts with customizable format (e.g., 100–280 chars, optional source).
 - Randomly selects Top, Breaking, or Viral news within 8 hours.
 - Prevents duplicate posts using local storage.
 - Supports OpenAI models: gpt-4o-mini (default), gpt-4o, gpt-3.5-turbo.
 - Customizable hotkey via popup (set in chrome://extensions/shortcuts).
 - Shows a blue, centered, pulsing loading indicator during post generation.
+- Alerts if no valid source is available, using a default source.
 
 ## Notes
 - Requires OpenAI API credits (monitor usage at https://platform.openai.com/).
