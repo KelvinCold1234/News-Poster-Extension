@@ -1,0 +1,3 @@
+ News Poster for X does not collect, store, or share any user data. The extension uses the OpenAI API to generate news posts, requiring users to provide their own API key, which is stored locally in chrome.storage. No personal information is processed or transmitted. Donations via PayPal are optional and handled by PayPal’s secure platform, with no payment data stored by the extension.
+
+ Last updated: July 2025
