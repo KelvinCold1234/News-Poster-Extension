@@ -93,24 +93,24 @@ async function generateNewsPost(tabId) {
       const newsType = newsTypes[Math.floor(Math.random() * newsTypes.length)];
       console.log('Selected random news type:', newsType);
 
-      // Define prompt based on news type with professional tone and 8-hour freshness
+      // Define prompt based on news type with emphasis on 8-hour freshness
       let summaryPrompt = `Generate a news post in this exact format: ${customGrabber}, one-sentence summary (${customMinWords}-${customMaxWords} words) of a `;
       if (newsType === 'top') {
-        summaryPrompt += 'major global event or topic from the last 8 hours';
+        summaryPrompt += 'major global event or topic reported in the last 8 hours';
       } else if (newsType === 'breaking') {
-        summaryPrompt += 'breaking news event from the last 8 hours';
+        summaryPrompt += 'breaking news event reported in the last 8 hours';
       } else if (newsType === 'viral') {
-        summaryPrompt += 'viral or trending topic (e.g., pop culture, technology) from the last 8 hours';
+        summaryPrompt += 'viral or trending topic (e.g., pop culture, technology) reported in the last 8 hours';
       }
       if (includeSource !== false) {
         summaryPrompt += `, ${customSource}`;
       }
       summaryPrompt += `. Total length must be between ${customMinChars} and ${customMaxChars} characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. `;
       if (includeSource !== false) {
-        summaryPrompt += 'Include exactly one source. ';
+        summaryPrompt += 'Include exactly one reputable news outlet (e.g., BBC, Reuters, CNN). ';
       }
-      summaryPrompt += 'Ensure the post is complete. No hashtags or user tags.';
-      console.log('Using news type:', newsType);
+      summaryPrompt += 'Ensure the post is complete and reflects news reported today, within the last 8 hours. No hashtags or user tags.';
+      console.log('Generated prompt:', summaryPrompt);
 
       // Generate news post with ChatGPT
       console.log('Sending request to OpenAI API...');
@@ -152,13 +152,21 @@ async function generateNewsPost(tabId) {
       }
 
       // Validate source presence if included
-      if (includeSource !== false && !summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?$/)) {
-        console.warn('No source detected, appending default source...');
-        summary = summary.substring(0, customMaxChars - 20) + ', Source: Reuters';
-      } else if (includeSource !== false) {
-        // If source is detected, remove any extra sources after the first
-        const firstSourceMatch = summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?/);
-        summary = summary.replace(/(\s*Source:\s*[A-Za-z\s]+(\.)?)+$/g, firstSourceMatch[0]);
+      if (includeSource !== false) {
+        const sourceMatch = summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?$/);
+        if (!sourceMatch) {
+          console.warn('No valid source detected, appending default source...');
+          summary = summary.substring(0, customMaxChars - 20) + ', Source: Reuters';
+          chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'No valid source available, using default source.' }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Failed to show source error:', chrome.runtime.lastError.message);
+            }
+          });
+        } else {
+          // Remove extra sources after the first
+          const firstSourceMatch = summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?/);
+          summary = summary.replace(/(\s*Source:\s*[A-Za-z\s]+(\.)?)+$/g, firstSourceMatch[0]);
+        }
       }
 
       // Check for duplicate
