@@ -33,6 +33,22 @@
       font-size: 14px;
       box-sizing: border-box;
     }
+    .range-container {
+      display: flex;
+      gap: 10px;
+    }
+    .range-container input {
+      width: 50%;
+    }
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .checkbox-container input {
+      width: auto;
+      margin-right: 10px;
+    }
     button {
       background-color: #1da1f2;
       color: #ffffff;
@@ -77,6 +93,30 @@
   <label for="hotkey">Hotkey (e.g., Ctrl+Shift+N)</label>
   <input id="hotkey" type="text" placeholder="Ctrl+Shift+N">
   <div class="note">Valid: Ctrl, Shift, Alt, plus a letter (e.g., Ctrl+Shift+P). Set in chrome://extensions/shortcuts.</div>
+
+  <h2>Post Format Customization</h2>
+  <label for="grabberStyle">Grabber Style</label>
+  <input id="grabberStyle" type="text" placeholder="ONE WORD CAPITALIZED GRABBER">
+
+  <label>Summary Word Range</label>
+  <div class="range-container">
+    <input id="minWords" type="number" placeholder="Min words (e.g., 15)" min="5" max="50">
+    <input id="maxWords" type="number" placeholder="Max words (e.g., 30)" min="5" max="50">
+  </div>
+
+  <label>Character Range</label>
+  <div class="range-container">
+    <input id="minChars" type="number" placeholder="Min chars (e.g., 150)" min="100" max="280">
+    <input id="maxChars" type="number" placeholder="Max chars (e.g., 260)" min="100" max="280">
+  </div>
+
+  <label for="sourceFormat">Source Format (if included)</label>
+  <input id="sourceFormat" type="text" placeholder="Source: [Outlet]">
+
+  <div class="checkbox-container">
+    <input id="includeSource" type="checkbox" checked>
+    <label for="includeSource">Include Source</label>
+  </div>
 
   <button id="save">Save Settings</button>
   <div id="status"></div>

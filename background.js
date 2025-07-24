@@ -5,9 +5,47 @@ chrome.commands.onCommand.addListener((command) => {
       const tab = tabs[0];
       console.log('Active tab URL:', tab.url);
       if (tab.url.includes('x.com') || tab.url.includes('twitter.com')) {
-        generateNewsPost(tab.id);
+        // Dynamically inject content.js
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }, () => {
+          if (chrome.runtime.lastError) {
+            console.error('Failed to inject content.js:', chrome.runtime.lastError.message);
+            return;
+          }
+          console.log('content.js injected');
+          // Short delay to allow content script to initialize
+          setTimeout(() => {
+            // Send message to show loading indicator
+            chrome.tabs.sendMessage(tab.id, { action: 'showLoading' }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error('Failed to show loading indicator:', chrome.runtime.lastError.message);
+              } else {
+                console.log('Loading indicator shown');
+              }
+            });
+            generateNewsPost(tab.id);
+          }, 100);
+        });
       } else {
         console.error('Please navigate to x.com to use this feature.');
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }, () => {
+          if (chrome.runtime.lastError) {
+            console.error('Failed to inject content.js for error:', chrome.runtime.lastError.message);
+            return;
+          }
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tab.id, { action: 'showError', message: 'Please navigate to x.com to use this feature.' }, () => {
+              if (chrome.runtime.lastError) {
+                console.error('Failed to show error:', chrome.runtime.lastError.message);
+              }
+            });
+          }, 100);
+        });
       }
     });
   }
@@ -15,15 +53,29 @@ chrome.commands.onCommand.addListener((command) => {
 
 async function generateNewsPost(tabId) {
   console.log('Starting generateNewsPost for tab:', tabId);
-  const { openaiKey, model } = await chrome.storage.sync.get(['openaiKey', 'model']);
+  const { openaiKey, model, grabberStyle, minWords, maxWords, minChars, maxChars, sourceFormat, includeSource } = await chrome.storage.sync.get(['openaiKey', 'model', 'grabberStyle', 'minWords', 'maxWords', 'minChars', 'maxChars', 'sourceFormat', 'includeSource']);
 
   if (!openaiKey) {
     console.error('No OpenAI API key set in extension popup.');
+    chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'Please set your OpenAI API key in the popup.' }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to show error:', chrome.runtime.lastError.message);
+      } else {
+        chrome.tabs.sendMessage(tabId, { action: 'hideLoading' });
+      }
+    });
     return;
   }
 
-  const selectedModel = model || 'gpt-4o-mini'; // Default to gpt-4o-mini
+  const selectedModel = model || 'gpt-4o-mini';
   console.log('Using model:', selectedModel);
+
+  const customGrabber = grabberStyle || 'ONE WORD CAPITALIZED GRABBER';
+  const customMinWords = minWords || 15;
+  const customMaxWords = maxWords || 30;
+  const customMinChars = minChars || 150;
+  const customMaxChars = maxChars || 260;
+  const customSource = includeSource !== false ? sourceFormat || 'Source: [Outlet]' : '';
 
   try {
     // Load previously posted summaries
@@ -42,14 +94,22 @@ async function generateNewsPost(tabId) {
       console.log('Selected random news type:', newsType);
 
       // Define prompt based on news type with professional tone and 8-hour freshness
-      let summaryPrompt;
+      let summaryPrompt = `Generate a news post in this exact format: ${customGrabber}, one-sentence summary (${customMinWords}-${customMaxWords} words) of a `;
       if (newsType === 'top') {
-        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, one-sentence summary (15-30 words) of a major global event or topic from the last 8 hours, Source: [one outlet, e.g., Reuters]. Total length must be between 150 and 260 characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
+        summaryPrompt += 'major global event or topic from the last 8 hours';
       } else if (newsType === 'breaking') {
-        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, one-sentence summary (15-30 words) of a breaking news event from the last 8 hours, Source: [one outlet, e.g., CNN]. Total length must be between 150 and 260 characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
+        summaryPrompt += 'breaking news event from the last 8 hours';
       } else if (newsType === 'viral') {
-        summaryPrompt = `Generate a news post in this exact format: ONE WORD CAPITALIZED GRABBER, one-sentence summary (15-30 words) of a viral or trending topic (e.g., pop culture, technology) from the last 8 hours, Source: [one outlet, e.g., BBC]. Total length must be between 150 and 260 characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. Include exactly one source. Ensure the post is complete. No hashtags or user tags.`;
+        summaryPrompt += 'viral or trending topic (e.g., pop culture, technology) from the last 8 hours';
       }
+      if (includeSource !== false) {
+        summaryPrompt += `, ${customSource}`;
+      }
+      summaryPrompt += `. Total length must be between ${customMinChars} and ${customMaxChars} characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. `;
+      if (includeSource !== false) {
+        summaryPrompt += 'Include exactly one source. ';
+      }
+      summaryPrompt += 'Ensure the post is complete. No hashtags or user tags.';
       console.log('Using news type:', newsType);
 
       // Generate news post with ChatGPT
@@ -63,32 +123,39 @@ async function generateNewsPost(tabId) {
         body: JSON.stringify({
           model: selectedModel,
           messages: [{ role: 'user', content: summaryPrompt }],
-          max_tokens: 100  // Increased for longer summaries
+          max_tokens: 100
         })
       });
       const summaryData = await summaryRes.json();
       if (summaryData.error) {
         console.error('OpenAI ChatGPT Error:', summaryData.error.code, summaryData.error.message);
+        chrome.tabs.sendMessage(tabId, { action: 'showError', message: `Failed to generate post: ${summaryData.error.message}` }, () => {
+          if (chrome.runtime.lastError) {
+            console.error('Failed to show error:', chrome.runtime.lastError.message);
+          } else {
+            chrome.tabs.sendMessage(tabId, { action: 'hideLoading' });
+          }
+        });
         throw new Error(`Failed to generate news post: ${summaryData.error.message}`);
       }
       summary = summaryData.choices[0].message.content.trim();
       console.log('Generated summary:', summary);
 
-      // Validate length (150-260 characters)
+      // Validate length
       const length = summary.length;
-      if (length < 150) {
+      if (length < customMinChars) {
         console.log('Summary too short (', length, ' chars), regenerating...');
         continue;
-      } if (length > 260) {
-        console.warn('Summary exceeds 260 characters, trimming...');
-        summary = summary.substring(0, 257) + '...';
+      } if (length > customMaxChars) {
+        console.warn('Summary exceeds', customMaxChars, ' characters, trimming...');
+        summary = summary.substring(0, customMaxChars - 3) + '...';
       }
 
-      // Validate source presence (flexible regex without required comma)
-      if (!summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?$/)) {
+      // Validate source presence if included
+      if (includeSource !== false && !summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?$/)) {
         console.warn('No source detected, appending default source...');
-        summary = summary.substring(0, 230) + ', Source: Reuters';
-      } else {
+        summary = summary.substring(0, customMaxChars - 20) + ', Source: Reuters';
+      } else if (includeSource !== false) {
         // If source is detected, remove any extra sources after the first
         const firstSourceMatch = summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?/);
         summary = summary.replace(/(\s*Source:\s*[A-Za-z\s]+(\.)?)+$/g, firstSourceMatch[0]);
@@ -103,16 +170,6 @@ async function generateNewsPost(tabId) {
 
       console.log('Final summary:', summary);
 
-      // Dynamically inject content.js to ensure it's loaded
-      console.log('Injecting content.js into tab:', tabId);
-      await chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        files: ['content.js']
-      });
-
-      // Short delay to allow content script to initialize
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       // Send to content script
       console.log('Sending message to content script for tab:', tabId);
       chrome.tabs.sendMessage(tabId, {
@@ -121,6 +178,13 @@ async function generateNewsPost(tabId) {
       }, (response) => {
         if (chrome.runtime.lastError) {
           console.error('Message send failed:', chrome.runtime.lastError.message);
+          chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'Failed to populate post. Check X page.' }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Failed to show error:', chrome.runtime.lastError.message);
+            } else {
+              chrome.tabs.sendMessage(tabId, { action: 'hideLoading' });
+            }
+          });
         } else {
           console.log('Message sent successfully, response:', response);
           // Store the summary after successful population
@@ -128,6 +192,12 @@ async function generateNewsPost(tabId) {
           if (postedSummaries.length > 50) postedSummaries.shift(); // Keep last 50
           chrome.storage.local.set({ postedSummaries });
           console.log('Summary stored to prevent duplicates.');
+          // Hide loading indicator
+          chrome.tabs.sendMessage(tabId, { action: 'hideLoading' }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Failed to hide loading:', chrome.runtime.lastError.message);
+            }
+          });
         }
       });
       break; // Exit loop on success
@@ -135,10 +205,24 @@ async function generateNewsPost(tabId) {
 
     if (attempts >= maxAttempts) {
       console.error('Failed to generate unique summary after retries.');
+      chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'Failed to generate a unique news post.' }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('Failed to show error:', chrome.runtime.lastError.message);
+        } else {
+          chrome.tabs.sendMessage(tabId, { action: 'hideLoading' });
+        }
+      });
       throw new Error('Failed to generate a unique news post.');
     }
   } catch (error) {
     console.error('Error in generateNewsPost:', error);
+    chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'Error generating post: ' + error.message }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to show error:', chrome.runtime.lastError.message);
+      } else {
+        chrome.tabs.sendMessage(tabId, { action: 'hideLoading' });
+      }
+    });
   }
 }
 

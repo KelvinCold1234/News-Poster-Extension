@@ -8,10 +8,86 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     isProcessing = true;
     populatePost(message.summary);
     sendResponse({ status: 'received' });
-    // Reset flag after a short delay to allow new messages
     setTimeout(() => { isProcessing = false; }, 1000);
+  } else if (message.action === 'showLoading') {
+    showLoadingIndicator();
+    sendResponse({ status: 'loading shown' });
+  } else if (message.action === 'hideLoading') {
+    hideLoadingIndicator();
+    sendResponse({ status: 'loading hidden' });
+  } else if (message.action === 'showError') {
+    showError(message.message);
+    sendResponse({ status: 'error shown' });
   }
 });
+
+function showLoadingIndicator() {
+  // Remove any existing loading indicator
+  hideLoadingIndicator();
+  // Create loading div
+  const loadingDiv = document.createElement('div');
+  loadingDiv.id = 'news-poster-loading';
+  loadingDiv.style.position = 'fixed';
+  loadingDiv.style.top = '50%';
+  loadingDiv.style.left = '50%';
+  loadingDiv.style.transform = 'translate(-50%, -50%)';
+  loadingDiv.style.backgroundColor = '#1da1f2'; // X's blue
+  loadingDiv.style.color = '#ffffff';
+  loadingDiv.style.padding = '15px 30px';
+  loadingDiv.style.borderRadius = '8px';
+  loadingDiv.style.zIndex = '9999';
+  loadingDiv.style.fontFamily = 'Arial, sans-serif';
+  loadingDiv.style.fontSize = '16px';
+  loadingDiv.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
+  loadingDiv.style.animation = 'pulse 1.5s ease-in-out infinite';
+  loadingDiv.textContent = 'Generating post...';
+  document.body.appendChild(loadingDiv);
+  // Add CSS animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+  console.log('Loading indicator displayed');
+}
+
+function hideLoadingIndicator() {
+  const loadingDiv = document.getElementById('news-poster-loading');
+  const style = document.querySelector('style[data-news-poster]');
+  if (loadingDiv) {
+    loadingDiv.remove();
+    console.log('Loading indicator removed');
+  }
+  if (style) {
+    style.remove();
+  }
+}
+
+function showError(message) {
+  hideLoadingIndicator();
+  const errorDiv = document.createElement('div');
+  errorDiv.id = 'news-poster-error';
+  errorDiv.style.position = 'fixed';
+  errorDiv.style.top = '50%';
+  errorDiv.style.left = '50%';
+  errorDiv.style.transform = 'translate(-50%, -50%)';
+  errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+  errorDiv.style.color = '#ffffff';
+  errorDiv.style.padding = '15px 30px';
+  errorDiv.style.borderRadius = '8px';
+  errorDiv.style.zIndex = '9999';
+  errorDiv.style.fontFamily = 'Arial, sans-serif';
+  errorDiv.style.fontSize = '16px';
+  errorDiv.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
+  errorDiv.textContent = message;
+  document.body.appendChild(errorDiv);
+  setTimeout(() => errorDiv.remove(), 3000);
+  console.log('Error displayed:', message);
+}
 
 function populatePost(summary) {
   console.log('Attempting to populate post with summary:', summary);
@@ -33,7 +109,7 @@ function populatePost(summary) {
       'a[href="/compose/tweet"]',
       'button[aria-label="Tweet"]'
     ]);
-    console.log('Could not find the "Post" button on X. Please ensure you\'re on the home page.');
+    chrome.runtime.sendMessage({ action: 'showError', message: 'Could not find the "Post" button on X.' });
     isProcessing = false;
     return;
   }
@@ -55,14 +131,14 @@ function populatePost(summary) {
     if (editor) {
       clearInterval(interval);
       console.log('Composer found, populating text...');
-      // Populate text (single method to avoid duplicates)
       try {
         editor.focus();
         document.execCommand('insertText', false, summary);
         console.log('Text populated successfully');
+        chrome.runtime.sendMessage({ action: 'hideLoading' });
       } catch (err) {
         console.error('Failed to insert text:', err);
-        console.log('Failed to populate post. Please try again.');
+        chrome.runtime.sendMessage({ action: 'showError', message: 'Failed to populate post.' });
       }
       isProcessing = false;
     } else if (attempts >= maxAttempts) {
@@ -74,7 +150,7 @@ function populatePost(summary) {
         'div[role="textbox"][aria-label="Tweet text"]',
         'div[contenteditable="true"]'
       ]);
-      console.log('Could not find composer elements. X\'s UI may have changed - please check for updates.');
+      chrome.runtime.sendMessage({ action: 'showError', message: 'Could not find composer elements.' });
       isProcessing = false;
     }
   }, 500);
