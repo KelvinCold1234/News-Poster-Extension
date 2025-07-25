@@ -77,6 +77,11 @@ async function generateNewsPost(tabId) {
   const customMaxChars = maxChars || 260;
   const customSource = includeSource !== false ? sourceFormat || 'Source: [Outlet]' : '';
 
+  // Get current date for prompt and post
+  const currentDate = new Date();
+  const formattedDate = currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); // e.g., "July 25, 2025"
+  const dateStr = `, Date: ${formattedDate}`;
+
   try {
     // Load previously posted summaries
     let { postedSummaries } = await chrome.storage.local.get(['postedSummaries']);
@@ -93,23 +98,23 @@ async function generateNewsPost(tabId) {
       const newsType = newsTypes[Math.floor(Math.random() * newsTypes.length)];
       console.log('Selected random news type:', newsType);
 
-      // Define prompt based on news type with emphasis on 8-hour freshness
+      // Define prompt based on news type with professional tone and 8-hour freshness
       let summaryPrompt = `Generate a news post in this exact format: ${customGrabber}, one-sentence summary (${customMinWords}-${customMaxWords} words) of a `;
       if (newsType === 'top') {
-        summaryPrompt += 'major global event or topic reported in the last 8 hours';
+        summaryPrompt += 'major global event or topic reported in the last 8 hours on ${formattedDate}';
       } else if (newsType === 'breaking') {
-        summaryPrompt += 'breaking news event reported in the last 8 hours';
+        summaryPrompt += 'breaking news event reported in the last 8 hours on ${formattedDate}';
       } else if (newsType === 'viral') {
-        summaryPrompt += 'viral or trending topic (e.g., pop culture, technology) reported in the last 8 hours';
+        summaryPrompt += 'viral or trending topic (e.g., pop culture, technology) reported in the last 8 hours on ${formattedDate}';
       }
       if (includeSource !== false) {
         summaryPrompt += `, ${customSource}`;
       }
       summaryPrompt += `. Total length must be between ${customMinChars} and ${customMaxChars} characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. `;
       if (includeSource !== false) {
-        summaryPrompt += 'Include exactly one reputable news outlet (e.g., BBC, Reuters, CNN). ';
+        summaryPrompt += 'Include exactly one source from a reputable outlet (e.g., BBC, Reuters, CNN). ';
       }
-      summaryPrompt += 'Ensure the post is complete and reflects news reported today, within the last 8 hours. No hashtags or user tags.';
+      summaryPrompt += 'Ensure the post is complete. No hashtags or user tags.';
       console.log('Generated prompt:', summaryPrompt);
 
       // Generate news post with ChatGPT
@@ -175,6 +180,9 @@ async function generateNewsPost(tabId) {
         console.log('Duplicate detected, regenerating...');
         continue;
       }
+
+      // Append date of the news source
+      summary += dateStr;
 
       console.log('Final summary:', summary);
 
