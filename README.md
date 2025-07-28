@@ -1,13 +1,13 @@
 # News Poster for X
 
-A Chrome extension that generates customizable news posts using the OpenAI ChatGPT API and populates them in X's composer with a hotkey. Posts can be formatted to your style (e.g., grabber, word/char range, optional source). Support continued development with a donation via PayPal!
+A Chrome extension that fetches top national news from the GNews API and uses the OpenAI ChatGPT API to generate awesome, customizable posts, populating them in X's composer with a hotkey.
 
 **Download from Chrome Web Store**: [Insert Store URL]
 
 ## Installation
 1. Install from the Chrome Web Store or clone this repository.
 2. If using the repository, go to `chrome://extensions/`, enable "Developer mode", click "Load unpacked", and select the folder.
-3. Open the extension popup, enter your OpenAI API key (from https://platform.openai.com/), select a model (gpt-4o-mini, gpt-4o, or gpt-3.5-turbo), and set a custom hotkey (e.g., Ctrl+Shift+P).
+3. Open the extension popup, enter your OpenAI API key (from https://platform.openai.com/) and GNews API key (from https://gnews.io/), select a model (gpt-4.1, gpt-4o, gpt-4o-mini, or gpt-3.5-turbo), and set a custom hotkey (e.g., Ctrl+Shift+P).
 
 ## Usage
 - Navigate to https://x.com/home and log in.
@@ -17,16 +17,15 @@ A Chrome extension that generates customizable news posts using the OpenAI ChatG
 - Review and click "Post" on X.
 
 ## Features
-- Generates posts with customizable format (e.g., 100–280 chars, optional source).
-- Randomly selects Top, Breaking, or Viral news within 8 hours.
+- Fetches top national news from GNews API (over 60,000 sources).
+- Uses ChatGPT to create awesome, X-friendly summaries with customizable format (e.g., 100–280 chars, optional source).
 - Prevents duplicate posts using local storage.
-- Supports OpenAI models: gpt-4o-mini (default), gpt-4o, gpt-3.5-turbo.
+- Supports OpenAI models: gpt-4.1 (most recent), gpt-4o, gpt-4o-mini, gpt-3.5-turbo.
 - Customizable hotkey via popup (set in chrome://extensions/shortcuts).
 - Shows a blue, centered, pulsing loading indicator during post generation.
-- Alerts if no valid source is available, using a default source.
 
 ## Notes
-- Requires OpenAI API credits (monitor usage at https://platform.openai.com/).
+- Requires OpenAI API credits (monitor usage at https://platform.openai.com/) and a free GNews API key (100 requests/day limit, so limited to about 100 posts/day).
 - If X's UI changes, update selectors in `content.js` (inspect Post button/composer).
 - To clear stored posts, run `chrome.storage.local.remove('postedSummaries')` in the browser console.
 
