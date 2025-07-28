@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.storage.sync.get(['openaiKey', 'model', 'hotkey', 'grabberStyle', 'minWords', 'maxWords', 'minChars', 'maxChars', 'sourceFormat', 'includeSource'], (data) => {
+  chrome.storage.sync.get(['openaiKey', 'gnewsKey', 'model', 'hotkey', 'grabberStyle', 'minWords', 'maxWords', 'minChars', 'maxChars', 'sourceFormat', 'includeSource'], (data) => {
     document.getElementById('openaiKey').value = data.openaiKey || '';
-    document.getElementById('model').value = data.model || 'gpt-4o-mini';
+    document.getElementById('gnewsKey').value = data.gnewsKey || '';
+    document.getElementById('model').value = data.model || 'gpt-4.1';
     document.getElementById('hotkey').value = data.hotkey || 'Ctrl+Shift+N';
     document.getElementById('grabberStyle').value = data.grabberStyle || 'ONE WORD CAPITALIZED GRABBER';
     document.getElementById('minWords').value = data.minWords || 15;
@@ -14,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('save').addEventListener('click', () => {
     const openaiKey = document.getElementById('openaiKey').value.trim();
+    const gnewsKey = document.getElementById('gnewsKey').value.trim();
     const model = document.getElementById('model').value;
     const hotkey = document.getElementById('hotkey').value.trim();
     const grabberStyle = document.getElementById('grabberStyle').value.trim();
@@ -24,9 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const sourceFormat = document.getElementById('sourceFormat').value.trim();
     const includeSource = document.getElementById('includeSource').checked;
 
-    if (!openaiKey) {
+    if (!openaiKey || !gnewsKey) {
       const status = document.getElementById('status');
-      status.textContent = 'Please enter an OpenAI API key.';
+      status.textContent = 'Please enter both OpenAI and GNews API keys.';
       status.style.color = '#f44336'; // Red for error
       setTimeout(() => { status.textContent = ''; }, 3000);
       return;
@@ -51,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    chrome.storage.sync.set({ openaiKey, model, hotkey, grabberStyle, minWords, maxWords, minChars, maxChars, sourceFormat, includeSource }, () => {
+    chrome.storage.sync.set({ openaiKey, gnewsKey, model, hotkey, grabberStyle, minWords, maxWords, minChars, maxChars, sourceFormat, includeSource }, () => {
       const status = document.getElementById('status');
       status.textContent = 'Settings saved successfully!';
       status.style.color = '#4caf50';

@@ -53,11 +53,11 @@ chrome.commands.onCommand.addListener((command) => {
 
 async function generateNewsPost(tabId) {
   console.log('Starting generateNewsPost for tab:', tabId);
-  const { openaiKey, model, grabberStyle, minWords, maxWords, minChars, maxChars, sourceFormat, includeSource } = await chrome.storage.sync.get(['openaiKey', 'model', 'grabberStyle', 'minWords', 'maxWords', 'minChars', 'maxChars', 'sourceFormat', 'includeSource']);
+  const { openaiKey, gnewsKey, model, grabberStyle, minWords, maxWords, minChars, maxChars, sourceFormat, includeSource } = await chrome.storage.sync.get(['openaiKey', 'gnewsKey', 'model', 'grabberStyle', 'minWords', 'maxWords', 'minChars', 'maxChars', 'sourceFormat', 'includeSource']);
 
-  if (!openaiKey) {
-    console.error('No OpenAI API key set in extension popup.');
-    chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'Please set your OpenAI API key in the popup.' }, () => {
+  if (!openaiKey || !gnewsKey) {
+    console.error('API keys missing.');
+    chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'Please set both OpenAI and GNews API keys in the popup.' }, () => {
       if (chrome.runtime.lastError) {
         console.error('Failed to show error:', chrome.runtime.lastError.message);
       } else {
@@ -67,7 +67,7 @@ async function generateNewsPost(tabId) {
     return;
   }
 
-  const selectedModel = model || 'gpt-4o-mini';
+  const selectedModel = model || 'gpt-4.1';
   console.log('Using model:', selectedModel);
 
   const customGrabber = grabberStyle || 'ONE WORD CAPITALIZED GRABBER';
@@ -77,15 +77,11 @@ async function generateNewsPost(tabId) {
   const customMaxChars = maxChars || 260;
   const customSource = includeSource !== false ? sourceFormat || 'Source: [Outlet]' : '';
 
-  // Get current date for prompt and post
-  const currentDate = new Date();
-  const formattedDate = currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); // e.g., "July 25, 2025"
-  const dateStr = `, Date: ${formattedDate}`;
-
   try {
-    // Load previously posted summaries
+    // Load and clear previously posted summaries to ensure fresh articles
     let { postedSummaries } = await chrome.storage.local.get(['postedSummaries']);
-    postedSummaries = postedSummaries || [];
+    postedSummaries = []; // Clear to force new articles each time
+    chrome.storage.local.set({ postedSummaries });
 
     let summary;
     let attempts = 0;
@@ -93,31 +89,52 @@ async function generateNewsPost(tabId) {
 
     while (attempts < maxAttempts) {
       attempts++;
-      // Randomly select news type
-      const newsTypes = ['top', 'breaking', 'viral'];
-      const newsType = newsTypes[Math.floor(Math.random() * newsTypes.length)];
-      console.log('Selected random news type:', newsType);
+      // Fetch top national news from GNews API with max results
+      const gnewsUrl = `https://gnews.io/api/v4/top-headlines?token=${gnewsKey}&lang=en&country=us&max=10`;
+      console.log('GNews URL:', gnewsUrl);
 
-      // Define prompt based on news type with professional tone and 8-hour freshness
-      let summaryPrompt = `Generate a news post in this exact format: ${customGrabber}, one-sentence summary (${customMinWords}-${customMaxWords} words) of a `;
-      if (newsType === 'top') {
-        summaryPrompt += 'major global event or topic reported in the last 8 hours on ${formattedDate}';
-      } else if (newsType === 'breaking') {
-        summaryPrompt += 'breaking news event reported in the last 8 hours on ${formattedDate}';
-      } else if (newsType === 'viral') {
-        summaryPrompt += 'viral or trending topic (e.g., pop culture, technology) reported in the last 8 hours on ${formattedDate}';
+      const newsResponse = await fetch(gnewsUrl);
+      console.log('GNews response status:', newsResponse.status);
+      const newsData = await newsResponse.json();
+      console.log('GNews response data:', newsData);
+      if (newsResponse.status !== 200 || !newsData.articles || newsData.articles.length === 0) {
+        console.error('Failed to fetch news articles:', newsData.message || 'No articles found or invalid response');
+        chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'Failed to fetch top national news from GNews. ' + (newsData.message || 'No articles found or server issue.') }, () => {
+          if (chrome.runtime.lastError) {
+            console.error('Failed to show error:', chrome.runtime.lastError.message);
+          } else {
+            chrome.tabs.sendMessage(tabId, { action: 'hideLoading' });
+          }
+        });
+        // Fallback to general search if top-headlines fails
+        const fallbackUrl = `https://gnews.io/api/v4/search?q=news&token=${gnewsKey}&lang=en&max=10`;
+        console.log('Falling back to GNews search URL:', fallbackUrl);
+        const fallbackResponse = await fetch(fallbackUrl);
+        const fallbackData = await fallbackResponse.json();
+        if (fallbackResponse.status !== 200 || !fallbackData.articles || fallbackData.articles.length === 0) {
+          console.error('Fallback failed:', fallbackData.message || 'No articles found');
+          throw new Error('Both primary and fallback GNews requests failed.');
+        }
+        newsData.articles = fallbackData.articles; // Use fallback articles
       }
-      if (includeSource !== false) {
-        summaryPrompt += `, ${customSource}`;
-      }
-      summaryPrompt += `. Total length must be between ${customMinChars} and ${customMaxChars} characters for authenticity. Use a formal, professional, concise tone, focusing on core facts without sensationalism. `;
-      if (includeSource !== false) {
-        summaryPrompt += 'Include exactly one source from a reputable outlet (e.g., BBC, Reuters, CNN). ';
-      }
-      summaryPrompt += 'Ensure the post is complete. No hashtags or user tags.';
-      console.log('Generated prompt:', summaryPrompt);
+      console.log('Number of articles fetched:', newsData.articles.length);
 
-      // Generate news post with ChatGPT
+      // Pick a random article
+      const article = newsData.articles[Math.floor(Math.random() * newsData.articles.length)];
+      const articleTitle = article.title;
+      const articleDesc = article.description || '';
+      const articleSource = article.source.name;
+
+      console.log('Selected article:', articleTitle, 'Source:', articleSource);
+
+      // Generate awesome summary with ChatGPT
+      let summaryPrompt = `Transform this news article into an awesome, X-friendly post in this exact format: ${customGrabber}, one-sentence summary (${customMinWords}-${customMaxWords} words) based on "${articleTitle} - ${articleDesc}". `;
+      if (includeSource !== false) {
+        summaryPrompt += `, ${customSource.replace('[Outlet]', articleSource)}`;
+      }
+      summaryPrompt += `. Total length must be between ${customMinChars} and ${customMaxChars} characters. Use an exciting, concise tone to grab attention, focusing on key facts, and make it sound epic for X users. Ensure the post is complete. No hashtags or user tags.`;
+      console.log('Generated summary prompt:', summaryPrompt);
+
       console.log('Sending request to OpenAI API...');
       const summaryRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -128,13 +145,15 @@ async function generateNewsPost(tabId) {
         body: JSON.stringify({
           model: selectedModel,
           messages: [{ role: 'user', content: summaryPrompt }],
-          max_tokens: 100
+          max_tokens: 150
         })
       });
+      console.log('OpenAI response status:', summaryRes.status);
       const summaryData = await summaryRes.json();
+      console.log('OpenAI response data:', summaryData);
       if (summaryData.error) {
         console.error('OpenAI ChatGPT Error:', summaryData.error.code, summaryData.error.message);
-        chrome.tabs.sendMessage(tabId, { action: 'showError', message: `Failed to generate post: ${summaryData.error.message}` }, () => {
+        chrome.tabs.sendMessage(tabId, { action: 'showError', message: `Failed to generate summary: ${summaryData.error.message}` }, () => {
           if (chrome.runtime.lastError) {
             console.error('Failed to show error:', chrome.runtime.lastError.message);
           } else {
@@ -159,14 +178,9 @@ async function generateNewsPost(tabId) {
       // Validate source presence if included
       if (includeSource !== false) {
         const sourceMatch = summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?$/);
-        if (!sourceMatch) {
-          console.warn('No valid source detected, appending default source...');
-          summary = summary.substring(0, customMaxChars - 20) + ', Source: Reuters';
-          chrome.tabs.sendMessage(tabId, { action: 'showError', message: 'No valid source available, using default source.' }, () => {
-            if (chrome.runtime.lastError) {
-              console.error('Failed to show source error:', chrome.runtime.lastError.message);
-            }
-          });
+        if (!sourceMatch || summary.includes('[Outlet]')) {
+          console.warn('No valid source detected, using GNews source...');
+          summary = summary.replace('[Outlet]', articleSource);
         } else {
           // Remove extra sources after the first
           const firstSourceMatch = summary.match(/\s*Source:\s*[A-Za-z\s]+(\.)?/);
@@ -177,12 +191,9 @@ async function generateNewsPost(tabId) {
       // Check for duplicate
       const isDuplicate = postedSummaries.some(stored => jaccardSimilarity(summary, stored) > 0.8);
       if (isDuplicate) {
-        console.log('Duplicate detected, regenerating...');
-        continue;
+        console.log('Duplicate detected, fetching new articles...');
+        continue; // Fetch new articles instead of just regenerating summary
       }
-
-      // Append date of the news source
-      summary += dateStr;
 
       console.log('Final summary:', summary);
 
